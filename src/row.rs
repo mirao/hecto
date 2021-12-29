@@ -1,10 +1,14 @@
+use crate::highlighting;
 use crate::SearchDirection;
+
 use std::cmp;
+use termion::color;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Default)]
 pub struct Row {
     string: String,
+    highlighting: Vec<highlighting::Type>,
     len: usize,
 }
 
@@ -12,6 +16,7 @@ impl From<&str> for Row {
     fn from(slice: &str) -> Self {
         Self {
             string: String::from(slice),
+            highlighting: Vec::new(),
             len: slice.graphemes(true).count(),
         }
     }
@@ -23,11 +28,28 @@ impl Row {
         let start = cmp::min(start, end);
         let mut result = String::new();
         #[allow(clippy::integer_arithmetic)]
-        for grapheme in self.string.graphemes(true).skip(start).take(end - start) {
-            if grapheme == "\t" {
-                result.push(' ');
-            } else {
-                result.push_str(grapheme);
+        for (index, grapheme) in self
+            .string
+            .graphemes(true)
+            .enumerate()
+            .skip(start)
+            .take(end - start)
+        {
+            if let Some(c) = grapheme.chars().next() {
+                let highlighting_type = self
+                    .highlighting
+                    .get(index)
+                    .unwrap_or(&highlighting::Type::None);
+                let start_highlight =
+                    format!("{}", termion::color::Fg(highlighting_type.to_color()));
+                result.push_str(&start_highlight);
+                if c == '\t' {
+                    result.push(' ');
+                } else {
+                    result.push(c);
+                }
+                let end_highlight = format!("{}", termion::color::Fg(color::Reset));
+                result.push_str(&end_highlight);
             }
         }
         result
@@ -44,19 +66,26 @@ impl Row {
     #[allow(clippy::integer_arithmetic)]
     pub fn insert(&mut self, at: usize, c: char) {
         if at >= self.len() {
+            // Insert character to the end of line
             self.string.push(c);
-            self.len += 1;
-            return;
-        }
-        let mut result: String = String::new();
-        for (index, grapheme) in self.string.graphemes(true).enumerate() {
-            if index == at {
-                result.push(c);
+        } else {
+            // Insert character in the middle of line
+            let mut result: String = String::new();
+            for (index, grapheme) in self.string.graphemes(true).enumerate() {
+                if index == at {
+                    result.push(c);
+                }
+                result.push_str(grapheme);
             }
-            result.push_str(grapheme);
+            self.string = result;
         }
-        self.len += 1;
-        self.string = result;
+
+        // Prevents counting of emoji flag sequence, e.g. 🇨🇿 as two chars (🇨 and 🇿) instead of expected one char
+        // Double counting causes empty chars on line
+        // More info about emoji flags at https://en.wikipedia.org/wiki/Regional_indicator_symbol
+        if self.string.graphemes(true).count() > self.len() {
+            self.len += 1;
+        }
     }
 
     #[allow(clippy::integer_arithmetic)]
@@ -100,6 +129,7 @@ impl Row {
         self.len = length;
         Self {
             string: splitted_row,
+            highlighting: Vec::new(),
             len: splitted_length,
         }
     }
@@ -140,5 +170,21 @@ impl Row {
             }
         }
         None
+    }
+
+    pub fn highlight(&mut self) {
+        let mut highlighting = Vec::new();
+        for c in self.string.chars() {
+            if c.is_ascii_digit() {
+                highlighting.push(highlighting::Type::Number);
+            } else {
+                highlighting.push(highlighting::Type::None);
+            }
+        }
+        self.highlighting = highlighting;
+    }
+
+    pub fn get_string(&self) -> String {
+        self.string.clone()
     }
 }
