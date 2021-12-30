@@ -27,6 +27,7 @@ impl Row {
         let end = cmp::min(end, self.string.len());
         let start = cmp::min(start, end);
         let mut result = String::new();
+        let mut current_highlighting = &highlighting::Type::None;
         #[allow(clippy::integer_arithmetic)]
         for (index, grapheme) in self
             .string
@@ -40,18 +41,21 @@ impl Row {
                     .highlighting
                     .get(index)
                     .unwrap_or(&highlighting::Type::None);
-                let start_highlight =
-                    format!("{}", termion::color::Fg(highlighting_type.to_color()));
-                result.push_str(&start_highlight);
+                if highlighting_type != current_highlighting {
+                    current_highlighting = highlighting_type;
+                    let start_highlight =
+                        format!("{}", termion::color::Fg(highlighting_type.to_color()));
+                    result.push_str(&start_highlight);
+                }
                 if c == '\t' {
                     result.push(' ');
                 } else {
                     result.push(c);
                 }
-                let end_highlight = format!("{}", termion::color::Fg(color::Reset));
-                result.push_str(&end_highlight);
             }
         }
+        let end_highlight = format!("{}", termion::color::Fg(color::Reset));
+        result.push_str(&end_highlight);
         result
     }
 
@@ -174,8 +178,8 @@ impl Row {
 
     pub fn highlight(&mut self) {
         let mut highlighting = Vec::new();
-        for c in self.string.chars() {
-            if c.is_ascii_digit() {
+        for grapheme in self.string.graphemes(true) {
+            if grapheme.chars().any(|c| c.is_ascii_digit()) {
                 highlighting.push(highlighting::Type::Number);
             } else {
                 highlighting.push(highlighting::Type::None);
