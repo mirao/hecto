@@ -174,14 +174,19 @@ impl Editor {
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 if let Some(row) = self.document.row(self.cursor_position.y) {
+                    let mut move_cursor = false;
                     if let Some(grapheme) =
                         row.get_string().graphemes(true).nth(self.cursor_position.x)
                     {
-                        // Move cursor for single unicode characters and do not move cursor in case of finished emoji flag sequence (two unicode characters in one)
+                        // Move cursor for single unicode characters and do not move cursor in case of finished emoji flag sequence, e.g. 🇨🇿 (two unicode characters in one)
                         if grapheme == c.to_string() {
-                            self.move_cursor(Key::Right);
+                            move_cursor = true;
                         }
-                    } else if c == '\n' {
+                    } else {
+                        // ENTER is pressed
+                        move_cursor = true;
+                    }
+                    if move_cursor {
                         self.move_cursor(Key::Right);
                     }
                 }
