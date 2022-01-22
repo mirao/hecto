@@ -143,6 +143,10 @@ impl Row {
     }
 
     pub fn find(&self, query: &str, at: usize, direction: SearchDirection) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
         let start = if direction == SearchDirection::Forward {
             at
         } else {
@@ -176,13 +180,47 @@ impl Row {
         None
     }
 
-    pub fn highlight(&mut self) {
+    pub fn highlight(&mut self, word: Option<&str>) {
         let mut highlighting = Vec::new();
-        for grapheme in self.string.graphemes(true) {
+        let mut matches = Vec::new();
+        let mut search_index = 0;
+
+        if let Some(word) = word {
+            while let Some(search_match) = self.find(word, search_index, SearchDirection::Forward) {
+                matches.push(search_match);
+                if let Some(next_index) = search_match.checked_add(word.graphemes(true).count()) {
+                    search_index = next_index;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let mut index = 0;
+        'outer: while let Some(grapheme) = self.string.graphemes(true).nth(index) {
+            if let Some(word) = word {
+                if matches.contains(&index) {
+                    for _ in word.graphemes(true) {
+                        highlighting.push(highlighting::Type::Match);
+                        if let Some(next_index) = index.checked_add(1) {
+                            index = next_index;
+                        } else {
+                            break 'outer;
+                        }
+                    }
+                    continue;
+                }
+            }
+
             if grapheme.chars().any(|c| c.is_ascii_digit()) {
                 highlighting.push(highlighting::Type::Number);
             } else {
                 highlighting.push(highlighting::Type::None);
+            }
+            if let Some(next_index) = index.checked_add(1) {
+                index = next_index;
+            } else {
+                break;
             }
         }
         self.highlighting = highlighting;
