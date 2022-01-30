@@ -75,8 +75,8 @@ impl Editor {
             String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
         let document = if let Some(file_name) = args.get(1) {
             let doc = Document::open(file_name);
-            if let Ok(doc) = doc {
-                doc
+            if let Ok(doc_unwrapped) = doc {
+                doc_unwrapped
             } else {
                 initial_status = format!("ERR: Could not open file: {}", file_name);
                 Document::default()

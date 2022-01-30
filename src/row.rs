@@ -169,9 +169,9 @@ impl Row {
         } else {
             substring.rfind(query)
         };
-        if let Some(matching_byte_index) = matching_byte_index {
+        if let Some(matching_byte_index_unwrapped) = matching_byte_index {
             for (grapheme_index, (byte_index, _)) in substring.grapheme_indices(true).enumerate() {
-                if matching_byte_index == byte_index {
+                if matching_byte_index_unwrapped == byte_index {
                     #[allow(clippy::integer_arithmetic)]
                     return Some(start + grapheme_index);
                 }
@@ -185,10 +185,14 @@ impl Row {
         let mut matches = Vec::new();
         let mut search_index = 0;
 
-        if let Some(word) = word {
-            while let Some(search_match) = self.find(word, search_index, SearchDirection::Forward) {
+        if let Some(word_unwrapped) = word {
+            while let Some(search_match) =
+                self.find(word_unwrapped, search_index, SearchDirection::Forward)
+            {
                 matches.push(search_match);
-                if let Some(next_index) = search_match.checked_add(word.graphemes(true).count()) {
+                if let Some(next_index) =
+                    search_match.checked_add(word_unwrapped.graphemes(true).count())
+                {
                     search_index = next_index;
                 } else {
                     break;
@@ -196,11 +200,12 @@ impl Row {
             }
         }
 
+        let mut prev_is_separator = true;
         let mut index = 0;
         'outer: while let Some(grapheme) = self.string.graphemes(true).nth(index) {
-            if let Some(word) = word {
+            if let Some(word_unwrapped) = word {
                 if matches.contains(&index) {
-                    for _ in word.graphemes(true) {
+                    for _ in word_unwrapped.graphemes(true) {
                         highlighting.push(highlighting::Type::Match);
                         if let Some(next_index) = index.checked_add(1) {
                             index = next_index;
@@ -212,11 +217,27 @@ impl Row {
                 }
             }
 
-            if grapheme.chars().any(|c| c.is_ascii_digit()) {
+            let previous_highlight = if index > 0 {
+                #[allow(clippy::integer_arithmetic)]
+                highlighting
+                    .get(index - 1)
+                    .unwrap_or(&highlighting::Type::None)
+            } else {
+                &highlighting::Type::None
+            };
+
+            if grapheme.chars().any(|c| c.is_ascii_digit())
+                && (prev_is_separator || previous_highlight == &highlighting::Type::Number)
+                || grapheme.chars().any(|c| c == '.')
+                    && previous_highlight == &highlighting::Type::Number
+            {
                 highlighting.push(highlighting::Type::Number);
             } else {
                 highlighting.push(highlighting::Type::None);
             }
+            prev_is_separator = grapheme
+                .chars()
+                .any(|c| c.is_ascii_punctuation() || c.is_ascii_whitespace());
             if let Some(next_index) = index.checked_add(1) {
                 index = next_index;
             } else {
