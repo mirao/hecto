@@ -52,6 +52,7 @@ pub struct Editor {
     document: Document,
     status_message: StatusMessage,
     quit_times: u8,
+    highlighted_word: Option<String>,
 }
 
 impl Editor {
@@ -94,16 +95,25 @@ impl Editor {
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
             quit_times: QUIT_TIMES,
+            highlighted_word: None,
         }
     }
 
-    fn refresh_screen(&self) -> io::Result<()> {
+    fn refresh_screen(&mut self) -> io::Result<()> {
         Terminal::cursor_hide();
         Terminal::set_cursor_position(&Position::default());
         if self.should_quit {
             Terminal::clear_screen();
             println!("Goodbye.\r");
         } else {
+            self.document.highlight(
+                &self.highlighted_word,
+                Some(
+                    self.offset
+                        .y
+                        .saturating_add(self.terminal.size().height as usize),
+                ),
+            );
             self.draw_rows();
             self.draw_status_bar();
             self.draw_message_bar();
@@ -258,11 +268,11 @@ impl Editor {
                 } else if moved {
                     editor.move_cursor(Key::Left);
                 }
-                editor.document.highlight(Some(query));
+                editor.highlighted_word = Some(query.to_string());
             },
         )
         .unwrap_or(None);
-        self.document.highlight(None);
+        self.highlighted_word = None;
     }
 
     fn scroll(&mut self) {
@@ -336,7 +346,6 @@ impl Editor {
     }
 
     fn draw_status_bar(&self) {
-        let mut status;
         let width = self.terminal.size().width as usize;
 
         let modified_indicator = if self.document.is_dirty() {
@@ -351,16 +360,17 @@ impl Editor {
             file_name.truncate(20);
         }
 
-        status = format!(
+        let mut status = format!(
             "{} - {} lines{}",
             file_name,
             self.document.len(),
             modified_indicator
         );
         let line_indicator = format!(
-            "Ln {}, Col {}",
+            "Ln {}, Col {}, {}",
             self.cursor_position.y.saturating_add(1),
             self.cursor_position.x.saturating_add(1),
+            self.document.file_type()
         );
         #[allow(clippy::integer_arithmetic)]
         let len = status.len() + line_indicator.len();
