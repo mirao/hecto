@@ -365,15 +365,15 @@ impl Row {
         grapheme: &str,
         graphemes: &[&str],
     ) -> bool {
-        if opts.characters() && grapheme.chars().any(|c| c == '\'') {
+        if opts.characters() && grapheme.contains('\'') {
             if let Some(next_grapheme) = graphemes.get(index.saturating_add(1)) {
-                let closing_index = if next_grapheme.chars().any(|c| c == '\\') {
+                let closing_index = if next_grapheme.contains('\\') {
                     index.saturating_add(3)
                 } else {
                     index.saturating_add(2)
                 };
                 if let Some(closing_grapheme) = graphemes.get(closing_index) {
-                    if closing_grapheme.chars().any(|c| c == '\'') {
+                    if closing_grapheme.contains('\'') {
                         for _ in 0..=closing_index.saturating_sub(*index) {
                             self.highlighting.push(highlighting::Type::Character);
                             *index = index.saturating_add(1);
@@ -393,9 +393,9 @@ impl Row {
         grapheme: &str,
         graphemes: &[&str],
     ) -> bool {
-        if opts.comments() && grapheme.chars().any(|c| c == '/') {
+        if opts.comments() && grapheme.contains('/') {
             if let Some(next_grapheme) = graphemes.get(index.saturating_add(1)) {
-                if next_grapheme.chars().any(|c| c == '/') {
+                if next_grapheme.contains('/') {
                     for _ in *index..self.len() {
                         self.highlighting.push(highlighting::Type::Comment);
                         *index = index.saturating_add(1);
@@ -418,9 +418,9 @@ impl Row {
         if start_with_comment {
             *index = self.len();
             for (index_iter, grapheme_iter) in graphemes.iter().enumerate() {
-                if grapheme_iter.chars().any(|c| c == '*') {
+                if grapheme_iter.contains('*') {
                     if let Some(closing_slash) = graphemes.get(index_iter.saturating_add(1)) {
-                        if closing_slash.chars().any(|c| c == '/') {
+                        if closing_slash.contains('/') {
                             start_with_comment = false;
                             *index = index_iter.saturating_add(2);
                             break;
@@ -435,18 +435,18 @@ impl Row {
         }
 
         start_with_comment = true;
-        if opts.multiline_comments() && grapheme.chars().any(|c| c == '/') {
+        if opts.multiline_comments() && grapheme.contains('/') {
             if let Some(next_grapheme) = graphemes.get(index.saturating_add(1)) {
-                if next_grapheme.chars().any(|c| c == '*') {
+                if next_grapheme.contains('*') {
                     let mut closing_index = self.len();
                     for (index_iter, grapheme_iter) in
                         graphemes.iter().skip(index.saturating_add(2)).enumerate()
                     {
-                        if grapheme_iter.chars().any(|c| c == '*') {
+                        if grapheme_iter.contains('*') {
                             if let Some(closing_slash) =
                                 graphemes.get(index.saturating_add(index_iter.saturating_add(3)))
                             {
-                                if closing_slash.chars().any(|c| c == '/') {
+                                if closing_slash.contains('/') {
                                     closing_index =
                                         index.saturating_add(index_iter.saturating_add(4));
                                     start_with_comment = false;
@@ -473,16 +473,16 @@ impl Row {
         grapheme: &str,
         graphemes: &[&str],
     ) -> bool {
-        if opts.strings() & grapheme.chars().any(|c| c == '"') {
+        if opts.strings() & grapheme.contains('"') {
             loop {
                 self.highlighting.push(highlighting::Type::String);
                 *index = index.saturating_add(1);
                 if let Some(next_grapheme) = graphemes.get(*index) {
                     // '\a' or '\"' is a part of string
-                    if next_grapheme.chars().any(|c| c == '\\') {
+                    if next_grapheme.contains('\\') {
                         self.highlighting.push(highlighting::Type::String);
                         *index = index.saturating_add(1);
-                    } else if next_grapheme.chars().any(|c| c == '"') {
+                    } else if next_grapheme.contains('"') {
                         break;
                     }
                 } else {
