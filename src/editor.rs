@@ -272,6 +272,15 @@ impl Editor {
             },
         )
         .unwrap_or(None);
+        // Disable highlighting of found results by clearing of query
+        self.document.highlight(
+            &Some("".to_owned()),
+            Some(
+                self.offset
+                    .y
+                    .saturating_add(self.terminal.size().height as usize),
+            ),
+        );
         self.highlighted_word = None;
     }
 
